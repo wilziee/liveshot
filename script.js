@@ -8,11 +8,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resultVideo = document.getElementById('result-video');
     const btnDownload = document.getElementById('btn-download');
 
-    // KONFIGURASI APPLE LIVE PHOTO
+    // --- KONFIGURASI APPLE LIVE PHOTO ---
     const TARGET_FPS = 60;
     const FRAME_INTERVAL = 1000 / TARGET_FPS;
-    const PRE_SHUTTER_DURATION = 1500; // 1.5 detik sebelum (ms)
-    const POST_SHUTTER_DURATION = 1500; // 1.5 detik sesudah (ms)
+    const PRE_SHUTTER_DURATION = 1500; // 1.5 detik sebelum shutter (ms)
+    const POST_SHUTTER_DURATION = 1500; // 1.5 detik sesudah shutter (ms)
     const MAX_BUFFER_FRAMES = Math.ceil(PRE_SHUTTER_DURATION / FRAME_INTERVAL);
     const POST_SHUTTER_FRAMES = Math.ceil(POST_SHUTTER_DURATION / FRAME_INTERVAL);
 
@@ -25,11 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let finalVideoBlob = null;
     let bestFrameBitmap = null;
 
-    // Audio Shutter
-    const shutterSound = new Audio('https://www.soundjay.com/mechanical/camera-shutter-click-01.mp3'); // Ganti dengan aset lokal Anda
+    // Audio Shutter (Pastikan URL audio valid/lokal di project Anda)
+    const shutterSound = new Audio('https://www.soundjay.com/mechanical/camera-shutter-click-01.mp3'); 
     shutterSound.volume = 1.0;
 
-    // Setup UI Modal untuk Live Photo Behavior
+    // --- SETUP UI MODAL UNTUK LIVE PHOTO BEHAVIOR ---
     resultVideo.style.display = 'none'; // Sembunyikan player bawaan
     const liveContainer = document.createElement('div');
     liveContainer.style.position = 'relative';
@@ -54,14 +54,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     liveVideo.style.objectFit = 'contain';
     liveVideo.style.zIndex = '1';
     liveVideo.muted = false;
-    liveVideo.loop = false; // Mainkan sekali
+    liveVideo.loop = false; // Mainkan sekali lalu berhenti
     liveVideo.playsInline = true;
 
     liveContainer.appendChild(liveVideo);
     liveContainer.appendChild(photoImg);
     modal.insertBefore(liveContainer, btnDownload);
 
-    // 1. Inisialisasi Kamera (Request 60 FPS)
+    // --- 1. INISIALISASI KAMERA (Request 60 FPS) ---
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } },
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert("Gagal mengakses kamera. Pastikan izin diberikan.");
     }
 
-    // 2. Render Loop & Circular Buffer (Berjalan terus menerus)
+    // --- 2. RENDER LOOP & CIRCULAR BUFFER (Terus Berjalan) ---
     async function drawAndBuffer(timestamp) {
         if (!lastDrawTime) lastDrawTime = timestamp;
         const deltaTime = timestamp - lastDrawTime;
@@ -86,31 +86,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Gambar ke canvas view finder
         ctx.drawImage(videoCam, 0, 0, canvas.width, canvas.height);
 
-        // Efek Flash Shutter (Sangat Cepat ~100ms)
+        // Efek Flash Putih Sangat Cepat (~100ms)
         if (isFlashing) {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        // Buffer frame ke RAM jika saatnya
+        // Buffer frame ke RAM sesuai FPS
         if (deltaTime >= FRAME_INTERVAL) {
             lastDrawTime = timestamp;
+            
+            // Simpan frame saat ini ke memori
             const bitmap = await createImageBitmap(canvas);
 
             if (!isCapturingLive) {
-                // Mode Standby: Jaga buffer tetap di 1.5 detik terakhir
+                // Mode Standby: Jaga buffer tetap memegang 1.5 detik terakhir
                 frameBuffer.push(bitmap);
                 if (frameBuffer.length > MAX_BUFFER_FRAMES) {
                     const oldFrame = frameBuffer.shift();
                     oldFrame.close(); // Bersihkan RAM
                 }
             } else if (postShutterCount < POST_SHUTTER_FRAMES) {
-                // Mode Merekam (Setelah shutter ditekan)
+                // Mode Merekam: Tambahkan frame setelah shutter ditekan
                 frameBuffer.push(bitmap);
                 postShutterCount++;
 
                 if (postShutterCount === POST_SHUTTER_FRAMES) {
-                    processLivePhoto(); // Selesai merekam
+                    processLivePhoto(); // Selesai merekam, proses penggabungan
                 }
             }
         }
@@ -118,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         requestAnimationFrame(drawAndBuffer);
     }
 
-    // 3. Logika Shutter
+    // --- 3. LOGIKA SHUTTER DITEKAN ---
     btnShutter.addEventListener('click', () => {
         if (isCapturingLive) return;
 
@@ -127,39 +129,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         postShutterCount = 0;
         statusText.innerText = "Memproses Live Photo...";
 
-        // Efek Shutter Visual & Fisik
+        // Efek Shutter (Audio & Vibrasi)
         shutterSound.currentTime = 0;
-        shutterSound.play(); // Sinkron audio shutter
+        shutterSound.play();
+        if (navigator.vibrate) navigator.vibrate(40);
         
-        if (navigator.vibrate) navigator.vibrate(40); // Getaran halus
-        
-        // Flash 100ms
+        // Efek Flash Putih (100ms)
         isFlashing = true;
         setTimeout(() => isFlashing = false, 100);
 
-        // Scale kecil preview
+        // Efek Scale Kecil pada Preview (UI Feedback)
         canvas.style.transform = 'scale(0.97)';
         canvas.style.transition = 'transform 0.15s ease-out';
         setTimeout(() => { canvas.style.transform = 'scale(1)'; }, 150);
         
-        // Kamera/Video TIDAK DIHENTIKAN. Terus merekam di background.
+        // Catatan: Perekaman tidak dimulai di sini, melainkan dilanjutkan di dalam drawAndBuffer()
     });
 
-    // 4. Analisis Frame (Mencari Gambar Paling Tajam & Exposure Terbaik)
+    // --- 4. ANALISIS BEST FRAME (Ketajaman) ---
     function extractBestFrame(frames) {
-        // Karena proses deteksi mata/wajah butuh ML (lambat), 
-        // kita ambil frame saat shutter ditekan sebagai baseline, 
-        // dan mengecek sharpness sederhana (varian kontras) di 5 frame sekitarnya.
-        let bestIndex = MAX_BUFFER_FRAMES - 1; // Default: Frame tepat saat ditekan
+        let bestIndex = MAX_BUFFER_FRAMES - 1; // Default: Frame tepat saat tombol ditekan
         let maxSharpness = 0;
 
+        // Cek 5 frame di sekitar momen shutter ditekan
         const checkRange = 5; 
         const start = Math.max(0, bestIndex - checkRange);
         const end = Math.min(frames.length - 1, bestIndex + checkRange);
 
-        // Hidden canvas untuk kalkulasi pixel
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width / 4; // Downscale untuk performa
+        tempCanvas.width = canvas.width / 4; // Downscale agar ringan
         tempCanvas.height = canvas.height / 4;
         const tCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -167,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tCtx.drawImage(frames[i], 0, 0, tempCanvas.width, tempCanvas.height);
             const imageData = tCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
             
-            // Estimasi sharpness (sederhana) dari selisih pixel berdekatan
+            // Hitung kontras pixel bersebelahan (estimasi ketajaman)
             let sharpness = 0;
             for (let j = 0; j < imageData.length - 4; j += 4) {
                 sharpness += Math.abs(imageData[j] - imageData[j+4]);
@@ -181,20 +179,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         return frames[bestIndex];
     }
 
-    // 5. Proses Penggabungan (Motion Clip)
+    // --- 5. PROSES PENGGABUNGAN MOTION CLIP ---
     async function processLivePhoto() {
-        // Ambil Best Frame sebagai Thumbnail
         bestFrameBitmap = extractBestFrame(frameBuffer);
         
-        // Buat canvas sementara untuk merender ulang video dari buffer
         const renderCanvas = document.createElement('canvas');
         renderCanvas.width = canvas.width;
         renderCanvas.height = canvas.height;
         const renderCtx = renderCanvas.getContext('2d');
 
-        // Render buffer menjadi satu Video Clip
         const stream = renderCanvas.captureStream(TARGET_FPS);
-        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
         const chunks = [];
 
         recorder.ondataavailable = e => chunks.push(e.data);
@@ -202,11 +197,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             finalVideoBlob = new Blob(chunks, { type: 'video/webm' });
             liveVideo.src = URL.createObjectURL(finalVideoBlob);
             
-            // Set Thumbnail
+            // Jadikan best frame sebagai thumbnail beku
             renderCtx.drawImage(bestFrameBitmap, 0, 0);
             photoImg.src = renderCanvas.toDataURL('image/jpeg', 0.95);
 
-            // Bersihkan Buffer untuk shoot berikutnya
+            // Reset Buffer
             frameBuffer.forEach(bmp => bmp.close());
             frameBuffer = [];
             isCapturingLive = false;
@@ -219,38 +214,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         recorder.start();
 
-        // Mainkan frame ke render canvas (tanpa terlihat user)
+        // Render urutan frame ke dalam video secara internal
         for (const frame of frameBuffer) {
             renderCtx.drawImage(frame, 0, 0);
-            await new Promise(r => setTimeout(r, FRAME_INTERVAL)); // Sinkronisasi timing 60fps
+            await new Promise(r => setTimeout(r, FRAME_INTERVAL)); 
         }
 
         recorder.stop();
     }
 
-    // 6. Transisi Apple Live Photo (Haptic Touch / Long Press)
+    // --- 6. TRANSISI PEMUTARAN (Long Press / Haptic Touch) ---
     function playLivePhoto() {
         if (!finalVideoBlob) return;
         liveVideo.currentTime = 0;
         liveVideo.play();
         
-        // Efek Crossfade dan scale kecil
+        // Transisi halus: hilangkan foto, kecilkan video sedikit
         photoImg.style.opacity = '0';
         liveVideo.style.transform = 'scale(0.98)';
         
-        // Vibrasi kecil saat mulai
         if (navigator.vibrate) navigator.vibrate(20);
     }
 
     function stopLivePhoto() {
         liveVideo.pause();
         
-        // Kembali ke Thumbnail persis di frame terbaik
+        // Kembalikan seketika ke thumbnail
         photoImg.style.opacity = '1';
         liveVideo.style.transform = 'scale(1)';
     }
 
-    // Event Listener untuk Long Press di Container Live Photo
+    // Listener interaksi tekan lama (Desktop & Mobile)
     liveContainer.addEventListener('mousedown', playLivePhoto);
     liveContainer.addEventListener('touchstart', (e) => { e.preventDefault(); playLivePhoto(); });
     
@@ -258,21 +252,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     liveContainer.addEventListener('mouseleave', stopLivePhoto);
     liveContainer.addEventListener('touchend', stopLivePhoto);
 
-    // Pastikan video berakhir di frame thumbnail jika tidak dilepas
+    // Otomatis berhenti jika video habis
     liveVideo.addEventListener('ended', stopLivePhoto);
 
-    // 7. Tutup Modal
+    // --- 7. TUTUP MODAL ---
     document.getElementById('btn-close-modal').addEventListener('click', () => {
         modal.classList.add('hidden');
         stopLivePhoto();
     });
 
-    // 8. Download
+    // --- 8. DOWNLOAD ---
     btnDownload.addEventListener('click', () => {
         if (!finalVideoBlob) return;
         const a = document.createElement('a');
         a.href = URL.createObjectURL(finalVideoBlob);
-        a.download = `LivePhoto_${Date.now()}.webm`;
+        a.download = `LiveShot_${Date.now()}.webm`;
         a.click();
     });
 });

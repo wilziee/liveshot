@@ -116,3 +116,16 @@ body, html {
     20% { transform: scale(0.985); }
     100% { transform: scale(1); }
 }
+/* --- Footer Wilxd --- */
+#wilxd-footer {
+    position: absolute;
+    bottom: 20px; /* Jarak dari bawah layar */
+    width: 100%;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5); /* Warna putih transparan agar elegan dan tidak mencolok */
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    pointer-events: none; /* Supaya kalau teksnya kepencet, layarnya tetep ngerespons */
+    z-index: 10;
+}

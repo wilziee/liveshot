@@ -3,68 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>📸 XAERISOFT LIVESHOT</title>
+    <title>📸 Foto Live Trend</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app-container">
-        <!-- Viewfinder -->
-        <video id="camera-view" autoplay playsinline muted></video>
-        <canvas id="photo-canvas" style="display: none;"></canvas>
+        <!-- Kamera Asli disembunyikan, kita pakai Canvas untuk meniru layarnya -->
+        <video id="hidden-camera" autoplay playsinline muted style="display: none;"></video>
         
-        <!-- UI Overlays -->
-        <div id="top-bar" class="glass-panel">
-            <button id="btn-flash" class="icon-btn">⚡ Off</button>
-            <div id="status-indicator">LIVE RECORDING</div>
-            <button id="btn-settings" class="icon-btn">⚙️</button>
-        </div>
-
-        <div id="focus-ring" class="hidden"></div>
-
-        <div id="bottom-bar" class="glass-panel">
-            <button id="btn-gallery" class="gallery-thumb"></button>
+        <!-- Viewfinder Utama (Yang direkam) -->
+        <canvas id="viewfinder"></canvas>
+        
+        <!-- UI Elements -->
+        <div id="ui-layer">
+            <div id="status-text">Siap Merekam</div>
             
-            <div class="shutter-wrapper">
+            <div class="bottom-bar">
                 <button id="btn-shutter">
                     <div class="shutter-inner"></div>
                 </button>
-                <!-- Indikator Loading Buffer -->
-                <svg class="progress-ring" height="80" width="80">
-                    <circle id="progress-circle" stroke="white" stroke-width="4" fill="transparent" r="36" cx="40" cy="40"/>
-                </svg>
             </div>
-            
-            <button id="btn-switch-cam" class="icon-btn">🔄</button>
         </div>
 
-        <!-- Flash Effect -->
-        <div id="flash-overlay"></div>
-
-        <!-- Gallery Modal -->
-        <div id="gallery-modal" class="hidden">
-            <div class="gallery-header glass-panel">
-                <button id="btn-close-gallery">⬅ Back</button>
-                <h2>Gallery</h2>
-                <button id="btn-export">Export</button>
+        <!-- Modal Hasil Video -->
+        <div id="result-modal" class="hidden">
+            <div class="modal-header">
+                <h2>Hasil "Foto Live"</h2>
+                <button id="btn-close-modal">Tutup</button>
             </div>
-            <div id="gallery-grid"></div>
-        </div>
-        
-        <!-- Fullscreen Player -->
-        <div id="player-modal" class="hidden">
-            <img id="player-image" src="" alt="LiveShot Photo">
-            <video id="player-video" loop muted playsinline></video>
-            <div class="player-hint glass-panel">Press & Hold to Play</div>
+            <video id="result-video" autoplay loop playsinline controls></video>
+            <button id="btn-download">⬇ Download Video Ini</button>
         </div>
     </div>
 
-    <!-- Modular Scripts (Loaded in sequence for pure vanilla JS without build tools) -->
-    <script src="storage.js"></script>
-    <script src="buffer.js"></script>
-    <script src="camera.js"></script>
-    <script src="capture.js"></script>
-    <script src="player.js"></script>
-    <script src="gallery.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

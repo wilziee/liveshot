@@ -1,8 +1,6 @@
 :root {
     --bg-dark: #000000;
-    --glass-bg: rgba(30, 30, 30, 0.6);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --accent: #FFCC00;
+    --accent: #ffcc00;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -10,9 +8,8 @@
 body {
     background-color: var(--bg-dark);
     color: white;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, sans-serif;
     overflow: hidden;
-    touch-action: none; /* Cegah pull-to-refresh & pinch-zoom default browser */
 }
 
 #app-container {
@@ -20,90 +17,79 @@ body {
     width: 100vw;
     height: 100vh;
     display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#viewfinder {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 10;
+    pointer-events: none; /* Biar klik tembus kecuali di tombol */
+    display: flex;
     flex-direction: column;
     justify-content: space-between;
 }
 
-#camera-view {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 0;
+#status-text {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 1rem;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    transition: color 0.3s;
 }
+#status-text.recording { color: red; animation: blink 1s infinite; }
 
-/* Glassmorphism Panels */
-.glass-panel {
-    background: var(--glass-bg);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border-bottom: 1px solid var(--glass-border);
-    border-top: 1px solid var(--glass-border);
-    z-index: 10;
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.bottom-bar {
+    width: 100%;
+    padding-bottom: 50px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 20px;
+    justify-content: center;
+    pointer-events: auto;
 }
 
-#top-bar { position: absolute; top: 0; width: 100%; }
-#bottom-bar { position: absolute; bottom: 0; width: 100%; padding-bottom: 30px; }
-
-.icon-btn {
-    background: none; border: none; color: white;
-    font-size: 1.2rem; padding: 10px; border-radius: 50%;
-    transition: transform 0.2s;
-}
-.icon-btn:active { transform: scale(0.9); }
-
-/* Shutter Button (Apple Style) */
-.shutter-wrapper { position: relative; width: 80px; height: 80px; display: flex; justify-content: center; align-items: center; }
 #btn-shutter {
-    width: 70px; height: 70px;
-    border-radius: 50%; background: white;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: white;
     border: 4px solid var(--bg-dark);
     outline: 4px solid white;
     cursor: pointer;
-    transition: all 0.15s ease;
-    z-index: 2;
+    transition: transform 0.1s;
 }
-#btn-shutter:active { transform: scale(0.85); }
-.is-capturing #btn-shutter { border: 4px solid var(--accent); }
+#btn-shutter:active { transform: scale(0.9); }
+#btn-shutter:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Progress Ring untuk Buffer */
-.progress-ring { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; transform: rotate(-90deg); opacity: 0; }
-.progress-ring circle { stroke-dasharray: 226; stroke-dashoffset: 226; transition: stroke-dashoffset 2s linear; }
-.is-capturing .progress-ring { opacity: 1; }
-.is-capturing .progress-ring circle { stroke-dashoffset: 0; stroke: var(--accent); }
-
-/* Gallery Thumbnail */
-.gallery-thumb { width: 50px; height: 50px; border-radius: 10px; background: #333; border: 2px solid white; object-fit: cover; }
-
-/* Flash Animation */
-#flash-overlay {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: white; opacity: 0; z-index: 50; pointer-events: none;
-}
-@keyframes flashAnim {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-}
-.flash-active { animation: flashAnim 0.3s ease-out; }
-
-/* Gallery Grid & Player */
-#gallery-modal, #player-modal {
+/* Modal Hasil */
+#result-modal {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: var(--bg-dark); z-index: 100;
+    display: flex; flex-direction: column;
 }
-.hidden { display: none !important; }
-#gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; overflow-y: auto; height: calc(100% - 60px); }
-.grid-item { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; position: relative; }
-.grid-item::after { content: 'LIVE'; position: absolute; top: 5px; right: 5px; font-size: 0.6rem; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 3px; }
+#result-modal.hidden { display: none; }
 
-#player-modal { display: flex; justify-content: center; align-items: center; background: black; }
-#player-image, #player-video { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
-#player-video { opacity: 0; transition: opacity 0.3s ease; }
-.playing #player-video { opacity: 1; }
-.playing #player-image { opacity: 0; }
-.player-hint { position: absolute; top: 50px; font-size: 0.9rem; border-radius: 20px; animation: pulse 2s infinite; pointer-events: none;}
+.modal-header {
+    display: flex; justify-content: space-between; padding: 20px;
+    background: rgba(20,20,20,0.9);
+}
+.modal-header button { background: none; border: none; color: white; font-size: 1rem; cursor: pointer; }
 
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+#result-video {
+    flex-grow: 1; width: 100%; object-fit: contain; background: #111;
+}
+
+#btn-download {
+    margin: 20px; padding: 15px; border-radius: 10px;
+    background: white; color: black; font-weight: bold; border: none; cursor: pointer;
+}

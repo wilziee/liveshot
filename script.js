@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const videoCam = document.getElementById('hidden-camera');
     const canvas = document.getElementById('viewfinder');
-    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }); // desynchronized: true mengurangi latency canvas
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
     const playbackCanvas = document.getElementById('playback-canvas');
     const playCtx = playbackCanvas.getContext('2d', { alpha: false, desynchronized: true });
     
@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const PRE_FRAMES = 45;  
     const POST_FRAMES = 45; 
 
-    // State & Memori
     let ringBuffer = [];
     let isCapturing = false;
     let postCaptureFrames = [];
@@ -25,56 +24,86 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     let lastDrawTime = 0;
     let finalVideoBlob = null;
+    
+    let currentStream = null;
+    let isCameraLooping = false;
 
     const shutterSound = new Audio('https://www.soundjay.com/mechanical/camera-shutter-click-01.mp3');
     shutterSound.preload = 'auto';
 
-    // 1. Setup Kamera - UPGRADE KE FULL HD (1080p)
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-                facingMode: 'environment', 
-                width: { ideal: 1920 },  // Grafik HD 1080p
-                height: { ideal: 1080 },
-                frameRate: { ideal: 30 }
+    // 1. Setup Kamera Terpusat - UPGRADE KE 1440p (2K SUPER HD)
+    async function initCamera() {
+        try {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
             }
-        });
-        videoCam.srcObject = stream;
-        videoCam.onloadedmetadata = () => {
-            // Set resolusi internal canvas sesuai resolusi asli kamera (HD)
-            canvas.width = videoCam.videoWidth;
-            canvas.height = videoCam.videoHeight;
-            playbackCanvas.width = videoCam.videoWidth;
-            playbackCanvas.height = videoCam.videoHeight;
-            requestAnimationFrame(cameraLoop);
-        };
-    } catch (err) {
-        alert("Akses kamera ditolak atau tidak mendukung Full HD.");
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'environment', 
+                    width: { ideal: 2560 }, // 1440p (Batas maksimal RAM mobile browser sebelum crash)
+                    height: { ideal: 1440 },
+                    frameRate: { ideal: 30 }
+                }
+            });
+            
+            currentStream = stream;
+            videoCam.srcObject = stream;
+            
+            await videoCam.play();
+
+            videoCam.onloadedmetadata = () => {
+                canvas.width = videoCam.videoWidth;
+                canvas.height = videoCam.videoHeight;
+                playbackCanvas.width = videoCam.videoWidth;
+                playbackCanvas.height = videoCam.videoHeight;
+                
+                if (!isCameraLooping) {
+                    isCameraLooping = true;
+                    requestAnimationFrame(cameraLoop);
+                }
+            };
+        } catch (err) {
+            console.error("Camera Init Error:", err);
+            alert("Kamera gagal diakses. Pastikan izin diberikan.");
+        }
     }
 
-    // 2. Continuous Ring Buffer (DIOPTIMASI: Direct Hardware Capture)
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            if (resultView.classList.contains('hidden')) initCamera();
+        } else {
+            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+        }
+    });
+
+    initCamera();
+
+    // 2. Continuous Ring Buffer (Direct GPU Capture)
     async function cameraLoop(timestamp) {
+        if (!isCameraLooping) return;
+
         if (timestamp - lastDrawTime >= FRAME_INTERVAL) {
             lastDrawTime = timestamp;
             
-            // Render ke layar tetap jalan (GPU yang handle scaling via CSS object-fit)
-            ctx.drawImage(videoCam, 0, 0, canvas.width, canvas.height);
-            
-            // PERUBAHAN UTAMA: Capture langsung dari video tag, bukan canvas.
-            // Ini memotong beban kerja CPU secara drastis sehingga anti-ngelek/anti-frame drop!
-            const bitmap = await createImageBitmap(videoCam);
+            if (videoCam.readyState >= 2 && !videoCam.paused) {
+                try {
+                    ctx.drawImage(videoCam, 0, 0, canvas.width, canvas.height);
+                    
+                    // Bypass canvas rendering delay, tangkap pixel mentah langsung dari GPU
+                    const bitmap = await createImageBitmap(videoCam);
 
-            if (isCapturing) {
-                postCaptureFrames.push(bitmap);
-                if (postCaptureFrames.length >= POST_FRAMES) {
-                    finalizeLivePhoto();
-                }
-            } else {
-                ringBuffer.push(bitmap);
-                if (ringBuffer.length > PRE_FRAMES) {
-                    const oldFrame = ringBuffer.shift();
-                    oldFrame.close(); // Bersihkan RAM agar browser ringan
-                }
+                    if (isCapturing) {
+                        postCaptureFrames.push(bitmap);
+                        if (postCaptureFrames.length >= POST_FRAMES) finalizeLivePhoto();
+                    } else {
+                        ringBuffer.push(bitmap);
+                        if (ringBuffer.length > PRE_FRAMES) {
+                            const oldFrame = ringBuffer.shift();
+                            oldFrame.close();
+                        }
+                    }
+                } catch (e) {}
             }
         }
         requestAnimationFrame(cameraLoop);
@@ -82,11 +111,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 3. Shutter Ditekan
     btnShutter.addEventListener('click', async () => {
-        if (isCapturing) return;
+        if (isCapturing || videoCam.readyState < 2) return;
 
         shutterSound.currentTime = 0;
-        shutterSound.play().catch(e => console.log("Audio play error:", e));
-
+        shutterSound.play().catch(e => console.log("Audio error:", e));
         if (navigator.vibrate) navigator.vibrate(10);
 
         flashOverlay.classList.add('flash-active');
@@ -96,14 +124,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => canvas.classList.remove('shutter-shrink'), 250);
 
         isCapturing = true;
-        // Ambil Key Photo resolusi tinggi langsung dari stream
         livePhotoData.key = await createImageBitmap(videoCam);
         livePhotoData.pre = [...ringBuffer];
         ringBuffer = [];
         postCaptureFrames = [];
     });
 
-    // 4. Finalisasi Memori & Tampilkan Hasil
+    // 4. Finalisasi
     function finalizeLivePhoto() {
         isCapturing = false;
         livePhotoData.post = [...postCaptureFrames];
@@ -113,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         encodeVideoBackground(); 
     }
 
-    // 5. Playback Logic di Layar (Interactive Canvas View dengan Smooth Blend)
+    // 5. Playback Logic (Smooth Blend)
     let isPlaying = false;
     let playbackAnimationId = null;
     let crossfadeId = null;
@@ -191,10 +218,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('pointerup', stopPlayback);
     playbackCanvas.addEventListener('pointerleave', stopPlayback);
 
-    // 6. ADVANCED BACKGROUND ENCODING (Bitrate ditingkatkan untuk Kualitas HD)
+    // 6. ADVANCED BACKGROUND ENCODING (Super HD 10 Mbps)
     async function encodeVideoBackground() {
         btnDownload.disabled = true;
-        btnDownload.innerText = "Memproses HD...";
+        btnDownload.innerText = "Memproses Super HD...";
         
         const preFrames = livePhotoData.pre;
         const keyFrame = livePhotoData.key;
@@ -211,9 +238,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             error: e => console.error("Encoder Error", e)
         });
 
-        // UPGRADE: Bitrate dinaikkan ke 5.000.000 (5 Mbps) agar kompresi 1080p tetap jernih tanpa artefak kotak-kotak
+        // UPGRADE EXTREME: Bitrate dinaikkan ke 10.000.000 (10 Mbps) untuk menampung detail 1440p
         videoEncoder.configure({
-            codec: 'vp8', width: canvas.width, height: canvas.height, bitrate: 5000000, framerate: FPS
+            codec: 'vp8', width: canvas.width, height: canvas.height, bitrate: 10000000, framerate: FPS
         });
 
         let currentTimestamp = 0;
@@ -234,7 +261,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
         const oCtx = offscreen.getContext('2d', { alpha: false });
         const lastMotionFrame = mainFrames[mainFrames.length - 1];
-
         const fadeDuration = 250; 
         const fadeFramesCount = Math.round(fadeDuration / FRAME_INTERVAL); 
 
@@ -264,19 +290,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         finalVideoBlob = new Blob([buffer], { type: 'video/webm' });
         
         btnDownload.disabled = false;
-        btnDownload.innerText = "Download Live Photo HD";
+        btnDownload.innerText = "Download Super HD Live Photo";
     }
 
-    // 7. Download Action
+    // 7. Download
     btnDownload.addEventListener('click', () => {
         if (!finalVideoBlob) return;
         const a = document.createElement('a');
         a.href = URL.createObjectURL(finalVideoBlob);
-        a.download = `LivePhoto_HD_${Date.now()}.webm`;
+        a.download = `LivePhoto_SuperHD_${Date.now()}.webm`;
         a.click();
     });
 
-    // 8. Tutup dan Bersihkan Memori
+    // 8. Tutup dan Bersihkan Memori (Sangat Penting di Resolusi Tinggi)
     btnBack.addEventListener('click', () => {
         stopPlayback();
         resultView.classList.add('hidden');
@@ -288,5 +314,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         livePhotoData = { pre: [], key: null, post: [] };
         finalVideoBlob = null;
+        
+        if (!currentStream || currentStream.getTracks()[0].readyState === 'ended') {
+            initCamera();
+        }
     });
 });

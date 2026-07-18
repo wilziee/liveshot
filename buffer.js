@@ -1,53 +1,48 @@
-// buffer.js
-class LiveBuffer {
-    constructor(keepSeconds = 4) {
-        this.keepMs = keepSeconds * 1000;
-        this.chunks = [];
-        this.recorder = null;
-        this.isBuffering = false;
-    }
+// buffer.js - Circular Buffer Video Manager
+window.BufferManager = (() => {
+    let mediaRecorder;
+    let chunks = [];
+    const MAX_BUFFER_SECONDS = 3; // Simpan 3 detik ke belakang
+    const TIMESLICE_MS = 500; // Pisahkan chunk tiap 500ms
+    const MAX_CHUNKS = (MAX_BUFFER_SECONDS * 1000) / TIMESLICE_MS; 
 
-    start(stream) {
-        const mimeType = MediaRecorder.isTypeSupported('video/webm; codecs=vp8,opus') 
-            ? 'video/webm; codecs=vp8,opus' 
-            : 'video/mp4';
-
-        // OPTIMASI: Batasi bitrate agar tidak nge-lag saat merekam
-        this.recorder = new MediaRecorder(stream, { 
-            mimeType,
-            videoBitsPerSecond: 2500000 // 2.5 Mbps
-        });
-
-        this.recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) {
-                this.chunks.push({ time: Date.now(), data: e.data });
-                
-                // Hapus buffer yang lebih tua
-                const cutoff = Date.now() - this.keepMs;
-                while (this.chunks.length > 0 && this.chunks[0].time < cutoff) {
-                    this.chunks.shift();
+    const startBuffering = (stream) => {
+        try {
+            // Coba webm berkinerja tinggi, fallback ke mp4 jika didukung browser tertentu
+            let mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+            mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5000000 });
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    chunks.push(e.data);
+                    // Circular logic: Buang memori video terlama
+                    if (chunks.length > MAX_CHUNKS) {
+                        chunks.shift();
+                    }
                 }
-            }
-        };
-
-        // OPTIMASI: Rekam per 500ms agar beban I/O CPU berkurang
-        this.recorder.start(500); 
-        this.isBuffering = true;
-    }
-
-    stop() {
-        if (this.recorder && this.recorder.state !== 'inactive') {
-            this.recorder.stop();
+            };
+            
+            mediaRecorder.start(TIMESLICE_MS);
+            console.log("🎥 Live Buffer Started");
+        } catch (err) {
+            console.error("Buffer error:", err);
         }
-        this.isBuffering = false;
-        this.chunks = [];
-    }
+    };
 
-    async getCompiledBlob() {
-        if (this.chunks.length === 0) return null;
-        const blob = new Blob(this.chunks.map(c => c.data), { type: this.recorder.mimeType });
-        return blob;
-    }
-}
+    const extractBuffer = () => {
+        // Mengembalikan salinan chunk saat ini (Mewakili 2-3 detik SEBELUM tombol ditekan)
+        return [...chunks]; 
+    };
 
-const liveBuffer = new LiveBuffer(5); // Menyimpan 5 detik di RAM
+    const resetBuffer = () => {
+        chunks = [];
+    };
+
+    const stopBuffering = () => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+    };
+
+    return { startBuffering, extractBuffer, resetBuffer, stopBuffering, TIMESLICE_MS };
+})();

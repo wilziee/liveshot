@@ -1,89 +1,64 @@
-// script.js
+// script.js - Entry Point & Event Bindings
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Inisialisasi
-    await storage.init();
-    await camera.init();
-
-    // 2. UI Kamera
-    document.getElementById('btn-switch-cam').addEventListener('click', () => {
-        camera.toggleCamera();
-    });
-
-    const shutterBtn = document.getElementById('btn-shutter');
-    shutterBtn.addEventListener('click', async () => {
-        shutterBtn.disabled = true;
-        await capture.takeLiveShot();
-        shutterBtn.disabled = false;
-    });
-
-    // 3. UI Galeri
-    const galleryView = document.getElementById('gallery-view');
     
-    document.getElementById('btn-gallery').addEventListener('click', async () => {
-        const shots = await storage.getAllShots();
-        renderGalleryGrid(shots);
-        if (shots.length > 0) {
-            player.loadShot(shots[0]);
-        }
-        galleryView.classList.remove('hidden');
+    console.log("🚀 Memulai XAERISOFT LIVESHOT...");
+
+    // 1. Inisialisasi Database
+    await window.StorageDB.init();
+
+    // 2. Inisialisasi Kamera & Buffer
+    await window.CameraManager.initCamera();
+
+    // 3. Binding Event Listeners Utama
+    const btnShutter = document.getElementById('btn-shutter');
+    const btnSwitch = document.getElementById('btn-switch-cam');
+    const btnGallery = document.getElementById('btn-gallery');
+    
+    // Cegah zoom di iOS saat tap cepat
+    btnShutter.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
+
+    // Capture Trigger
+    btnShutter.addEventListener('pointerdown', async (e) => {
+        e.preventDefault();
+        btnShutter.style.transform = "scale(0.85)";
+        await window.CaptureManager.takeLiveShot();
+    });
+    
+    btnShutter.addEventListener('pointerup', (e) => {
+        btnShutter.style.transform = "scale(1)";
+    });
+
+    // Camera Switch
+    btnSwitch.addEventListener('click', () => {
+        window.CameraManager.toggleCamera();
+    });
+
+    // Gallery Routing
+    btnGallery.addEventListener('click', () => {
+        window.GalleryManager.openGallery();
     });
 
     document.getElementById('btn-close-gallery').addEventListener('click', () => {
-        galleryView.classList.add('hidden');
+        window.GalleryManager.closeGallery();
     });
-    
-    // Load Thumbnail pertama kali buka web
-    const initialShots = await storage.getAllShots();
-    if(initialShots.length > 0){
-        document.getElementById('btn-gallery').style.backgroundImage = `url(${initialShots[0].photo})`;
-    }
 
-    // 4. EKSPOR KE TIKTOK (Download Video)
-    document.getElementById('btn-export').addEventListener('click', async () => {
-        const activeImg = document.querySelector('.gallery-item.active');
-        if (!activeImg) {
-            alert('Belum ada foto yang dipilih!');
-            return;
-        }
+    // Player Routing (Klik kembali untuk tutup)
+    document.getElementById('player-modal').addEventListener('dblclick', () => {
+        window.PlayerManager.closePlayer();
+    });
 
-        const shots = await storage.getAllShots();
-        const currentShot = shots.find(shot => shot.photo === activeImg.src);
-
-        if (currentShot && currentShot.video) {
-            const videoUrl = URL.createObjectURL(currentShot.video);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = videoUrl;
-            a.download = `LivePhoto_TikTok_${currentShot.id}.webm`; 
-            
-            document.body.appendChild(a);
-            a.click(); // Eksekusi download ke HP/PC
-            
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(videoUrl);
-            }, 100);
+    // Simulasi Pinch Zoom Hardware
+    let currentZoom = 1;
+    document.getElementById('camera-view').addEventListener('wheel', (e) => {
+        const stream = window.CameraManager.getVideoElement().srcObject;
+        if (!stream) return;
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+        
+        if (capabilities.zoom) {
+            currentZoom += e.deltaY * -0.01;
+            currentZoom = Math.min(Math.max(currentZoom, capabilities.zoom.min), capabilities.zoom.max);
+            track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
         }
     });
 });
-
-function renderGalleryGrid(shots) {
-    const grid = document.getElementById('gallery-grid');
-    grid.innerHTML = '';
-    
-    shots.forEach((shot, index) => {
-        const img = document.createElement('img');
-        img.src = shot.photo;
-        img.className = 'gallery-item';
-        
-        // Buat item pertama jadi aktif default
-        if (index === 0) img.classList.add('active'); 
-
-        img.addEventListener('click', () => {
-            document.querySelectorAll('.gallery-item').forEach(el => el.classList.remove('active'));
-            img.classList.add('active');
-            player.loadShot(shot);
-        });
-        grid.appendChild(img);
-    });
-}

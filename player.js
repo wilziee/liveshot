@@ -1,62 +1,51 @@
-// player.js
-class LivePlayer {
-    constructor() {
-        this.container = document.getElementById('player-container');
-        this.imgEl = document.getElementById('player-image');
-        this.videoEl = document.getElementById('player-video');
-        
-        this.setupEvents();
-    }
+// player.js - Seamless Playback Logic
+window.PlayerManager = (() => {
+    const modal = document.getElementById('player-modal');
+    const imgEl = document.getElementById('player-image');
+    const vidEl = document.getElementById('player-video');
+    let currentLiveShot = null;
+    let pressTimer;
 
-    loadShot(shotData) {
-        this.imgEl.src = shotData.photo;
-        this.imgEl.style.opacity = '1';
-        this.videoEl.classList.add('hidden');
+    const openPlayer = (liveShotData) => {
+        currentLiveShot = liveShotData;
+        imgEl.src = URL.createObjectURL(liveShotData.photoBlob);
+        vidEl.src = URL.createObjectURL(liveShotData.videoBlob);
         
-        // OPTIMASI: Cegah Memory Leak dengan membersihkan URL sebelumnya
-        if (this.videoEl.src) {
-            URL.revokeObjectURL(this.videoEl.src); 
-        }
+        modal.classList.remove('hidden');
         
-        // Buat URL dari Blob video
-        const videoUrl = URL.createObjectURL(shotData.video);
-        this.videoEl.src = videoUrl;
-    }
+        // Setup Video
+        vidEl.load();
+        vidEl.currentTime = 0; // Pastikan mulai dari awal (buffer -2 detik)
+    };
 
-    setupEvents() {
-        const startPlay = () => {
-            this.videoEl.classList.remove('hidden');
-            this.videoEl.currentTime = 0;
-            
-            // OPTIMASI: Hilangkan foto (fade) hanya JIKA video sudah benar-benar play
-            this.videoEl.play().then(() => {
-                this.imgEl.style.opacity = '0'; // Smooth fade to video
-            }).catch(err => {
-                console.warn("Video play error/interrupted", err);
-            });
+    const closePlayer = () => {
+        modal.classList.add('hidden');
+        vidEl.pause();
+        currentLiveShot = null;
+    };
+
+    // --- INTERAKSI APPLE LIVE PHOTO (Tekan Lama) ---
+    const startPlayback = () => {
+        modal.classList.add('playing');
+        vidEl.play().catch(e => console.log("Autoplay blocked:", e));
+        
+        // Fitur Player: Loop sekali (berhenti saat selesai dan kembali ke foto)
+        vidEl.onended = () => {
+            stopPlayback();
         };
+    };
 
-        const stopPlay = () => {
-            this.imgEl.style.opacity = '1'; // Smooth fade back to photo
-            this.videoEl.pause();
-            setTimeout(() => this.videoEl.classList.add('hidden'), 300);
-        };
+    const stopPlayback = () => {
+        modal.classList.remove('playing');
+        vidEl.pause();
+        vidEl.currentTime = 0; 
+    };
 
-        // Support Mouse & Touch Gestures
-        this.container.addEventListener('mousedown', startPlay);
-        this.container.addEventListener('mouseup', stopPlay);
-        this.container.addEventListener('mouseleave', stopPlay);
-        
-        this.container.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startPlay();
-        }, {passive: false});
-        
-        this.container.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            stopPlay();
-        }, {passive: false});
-    }
-}
+    // Event Listener untuk Gesture di Modal Player
+    modal.addEventListener('pointerdown', startPlayback);
+    modal.addEventListener('pointerup', stopPlayback);
+    modal.addEventListener('pointerleave', stopPlayback);
+    modal.addEventListener('contextmenu', e => e.preventDefault()); // Matikan klik kanan
 
-const player = new LivePlayer();
+    return { openPlayer, closePlayer };
+})();

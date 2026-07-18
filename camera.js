@@ -1,47 +1,54 @@
-// camera.js
-class CameraSystem {
-    constructor() {
-        this.videoElement = document.getElementById('viewfinder');
-        this.currentStream = null;
-        this.facingMode = 'user'; // Default kamera depan
-    }
+// camera.js - Hardware Interaction
+window.CameraManager = (() => {
+    let currentStream = null;
+    let currentFacingMode = 'environment'; // Rear default
+    let videoElement = document.getElementById('camera-view');
+    let imageCapture = null; // ImageCapture API if available
 
-    async init() {
-        await this.startCamera();
-    }
-
-    async startCamera() {
-        if (this.currentStream) {
-            this.currentStream.getTracks().forEach(track => track.stop());
+    const initCamera = async () => {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
         }
+
+        const constraints = {
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 4096 }, // Force max res
+                height: { ideal: 2160 },
+                frameRate: { ideal: 60 }
+            },
+            audio: false // Live Photo Apple umumnya menyertakan audio, tapi di set false untuk privasi dasar web. Ubah ke true jika butuh.
+        };
 
         try {
-            const constraints = {
-                video: { 
-                    facingMode: this.facingMode,
-                    width: { ideal: 1080 },
-                    height: { ideal: 1920 } 
-                },
-                audio: true // Wajib agar audio dari HP ikut direkam ke Live Photo
-            };
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoElement.srcObject = currentStream;
             
-            this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-            this.videoElement.srcObject = this.currentStream;
-            
-            // Masukkan stream ke buffer
-            if (typeof liveBuffer !== 'undefined') {
-                liveBuffer.start(this.currentStream);
+            // Check for advanced hardware capabilities
+            const videoTrack = currentStream.getVideoTracks()[0];
+            if (window.ImageCapture) {
+                imageCapture = new ImageCapture(videoTrack);
             }
+            
+            // Mulai / Restart Background Buffer
+            window.BufferManager.stopBuffering();
+            window.BufferManager.resetBuffer();
+            window.BufferManager.startBuffering(currentStream);
+            
+            return currentStream;
         } catch (error) {
-            console.error("Gagal mengakses kamera:", error);
-            alert("Harap izinkan akses kamera & mikrofon untuk merekam Live Photo.");
+            console.error("Camera access failed:", error);
+            alert("Harap izinkan akses kamera.");
         }
-    }
+    };
 
-    toggleCamera() {
-        this.facingMode = this.facingMode === 'user' ? 'environment' : 'user';
-        this.startCamera();
-    }
-}
+    const toggleCamera = () => {
+        currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+        initCamera();
+    };
 
-const camera = new CameraSystem();
+    const getVideoElement = () => videoElement;
+    const getImageCapture = () => imageCapture;
+
+    return { initCamera, toggleCamera, getVideoElement, getImageCapture };
+})();

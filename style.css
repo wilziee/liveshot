@@ -1,214 +1,109 @@
 :root {
     --bg-dark: #000000;
-    --glass-bg: rgba(25, 25, 25, 0.4);
-    --glass-border: rgba(255, 255, 255, 0.15);
-    --accent: #ffd60a;
-    --text: #ffffff;
+    --glass-bg: rgba(30, 30, 30, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --accent: #FFCC00;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 
-body, html {
-    width: 100%;
-    height: 100%;
+body {
     background-color: var(--bg-dark);
+    color: white;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     overflow: hidden;
-    color: var(--text);
+    touch-action: none; /* Cegah pull-to-refresh & pinch-zoom default browser */
 }
 
-#app {
+#app-container {
     position: relative;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
 }
 
-/* Kamera & Efek */
-#viewfinder {
+#camera-view {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0; width: 100%; height: 100%;
     object-fit: cover;
-    z-index: 1;
+    z-index: 0;
 }
 
-#flash-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: white;
-    opacity: 0;
+/* Glassmorphism Panels */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-bottom: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-border);
     z-index: 10;
-    pointer-events: none;
-    transition: opacity 0.1s ease-out;
-}
-
-/* Glassmorphism UI */
-.glass-header, .glass-footer {
-    position: absolute;
-    width: 100%;
-    z-index: 5;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    padding: 15px 20px;
 }
 
-.glass-header { top: 0; border-bottom: 1px solid var(--glass-border); }
-.glass-footer { bottom: 0; padding-bottom: 40px; border-top: 1px solid var(--glass-border); }
+#top-bar { position: absolute; top: 0; width: 100%; }
+#bottom-bar { position: absolute; bottom: 0; width: 100%; padding-bottom: 30px; }
 
-/* Kontrol UI */
 .icon-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid var(--glass-border);
-    border-radius: 50%;
-    width: 44px;
-    height: 44px;
-    color: white;
-    font-size: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    backdrop-filter: blur(10px);
+    background: none; border: none; color: white;
+    font-size: 1.2rem; padding: 10px; border-radius: 50%;
     transition: transform 0.2s;
 }
-
 .icon-btn:active { transform: scale(0.9); }
 
-.live-indicator {
-    background: rgba(0, 0, 0, 0.5);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    box-shadow: 0 0 10px rgba(255, 214, 10, 0.3);
-}
-
-/* Tombol Shutter Premium */
-.shutter-container {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    border: 3px solid white;
-}
-
+/* Shutter Button (Apple Style) */
+.shutter-wrapper { position: relative; width: 80px; height: 80px; display: flex; justify-content: center; align-items: center; }
 #btn-shutter {
-    width: 58px;
-    height: 58px;
-    border-radius: 50%;
-    background: white;
-    border: none;
-    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-#btn-shutter:active {
-    width: 50px;
-    height: 50px;
-    background: #e0e0e0;
-}
-
-.thumbnail-btn {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
-    border: 1px solid white;
-    background-size: cover;
-    background-color: rgba(255, 255, 255, 0.1);
+    width: 70px; height: 70px;
+    border-radius: 50%; background: white;
+    border: 4px solid var(--bg-dark);
+    outline: 4px solid white;
     cursor: pointer;
+    transition: all 0.15s ease;
+    z-index: 2;
 }
+#btn-shutter:active { transform: scale(0.85); }
+.is-capturing #btn-shutter { border: 4px solid var(--accent); }
 
-/* Galeri & Player */
-.glass-panel {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    transition: opacity 0.3s ease;
-}
+/* Progress Ring untuk Buffer */
+.progress-ring { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; transform: rotate(-90deg); opacity: 0; }
+.progress-ring circle { stroke-dasharray: 226; stroke-dashoffset: 226; transition: stroke-dashoffset 2s linear; }
+.is-capturing .progress-ring { opacity: 1; }
+.is-capturing .progress-ring circle { stroke-dashoffset: 0; stroke: var(--accent); }
 
-.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
+/* Gallery Thumbnail */
+.gallery-thumb { width: 50px; height: 50px; border-radius: 10px; background: #333; border: 2px solid white; object-fit: cover; }
 
-.gallery-header {
-    display: flex; justify-content: space-between; padding: 20px;
+/* Flash Animation */
+#flash-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: white; opacity: 0; z-index: 50; pointer-events: none;
 }
-.gallery-header button {
-    background: none; border: none; color: var(--accent); font-size: 16px; cursor: pointer;
+@keyframes flashAnim {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
 }
+.flash-active { animation: flashAnim 0.3s ease-out; }
 
-#player-container {
-    position: relative;
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
+/* Gallery Grid & Player */
+#gallery-modal, #player-modal {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg-dark); z-index: 100;
 }
+.hidden { display: none !important; }
+#gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; overflow-y: auto; height: calc(100% - 60px); }
+.grid-item { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; position: relative; }
+.grid-item::after { content: 'LIVE'; position: absolute; top: 5px; right: 5px; font-size: 0.6rem; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 3px; }
 
-#player-image, #player-video {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    transition: opacity 0.3s ease;
-}
+#player-modal { display: flex; justify-content: center; align-items: center; background: black; }
+#player-image, #player-video { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
+#player-video { opacity: 0; transition: opacity 0.3s ease; }
+.playing #player-video { opacity: 1; }
+.playing #player-image { opacity: 0; }
+.player-hint { position: absolute; top: 50px; font-size: 0.9rem; border-radius: 20px; animation: pulse 2s infinite; pointer-events: none;}
 
-.hold-hint {
-    position: absolute;
-    top: 20px;
-    background: rgba(0,0,0,0.6);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    pointer-events: none;
-    opacity: 0.8;
-}
-
-#gallery-grid {
-    height: 120px;
-    display: flex;
-    overflow-x: auto;
-    padding: 10px;
-    gap: 10px;
-    border-top: 1px solid var(--glass-border);
-}
-
-.gallery-item {
-    width: 80px;
-    height: 80px;
-    border-radius: 8px;
-    object-fit: cover;
-    cursor: pointer;
-    border: 2px solid transparent;
-}
-.gallery-item.active { border-color: var(--accent); }
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }

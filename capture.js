@@ -1,61 +1,68 @@
-// capture.js
-class CaptureSystem {
-    constructor() {
-        this.flashElement = document.getElementById('flash-overlay');
-        this.shutterSound = new Audio('https://www.soundjay.com/camera/sounds/camera-shutter-click-01.mp3'); // Simulasi
-    }
+// capture.js - The Shutter Engine
+window.CaptureManager = (() => {
+    const canvas = document.getElementById('photo-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let isCapturing = false;
 
-    triggerFlash() {
-        this.flashElement.style.opacity = '1';
-        this.flashElement.style.transition = 'none';
-        
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this.flashElement.style.transition = 'opacity 0.4s ease-out';
-                this.flashElement.style.opacity = '0';
-            });
-        });
-    }
+    // --- FITUR BONUS: Deteksi Kualitas Frame Dasar ---
+    const calculateBlur = (imageData) => {
+        // Algoritma simulasi deteksi blur sederhana (Laplacian variance detection stubs)
+        // Dalam implementasi nyata, kita menggunakan WebWorker agar UI tidak lag.
+        return true; // Asumsikan selalu tajam untuk demo ini
+    };
 
-    async takeLiveShot() {
-        if (!camera.currentStream) return;
+    const takeLiveShot = async () => {
+        if (isCapturing) return;
+        isCapturing = true;
+        document.body.classList.add('is-capturing');
 
-        // 1. Animasi & Suara Shutter
-        this.triggerFlash();
-        this.shutterSound.play().catch(e => {}); // Ignore autoplay error
+        // 1. EFEK FLASH UI
+        const flash = document.getElementById('flash-overlay');
+        flash.classList.add('flash-active');
+        setTimeout(() => flash.classList.remove('flash-active'), 300);
 
-        // 2. Ambil Foto Resolusi Tinggi via Canvas
-        const video = camera.videoElement;
-        const canvas = document.createElement('canvas');
+        // 2. CAPTURE HIGH-RES PHOTO
+        const video = window.CameraManager.getVideoElement();
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Simpan foto sebagai Base64 WebP (lebih efisien)
-        const photoDataUrl = canvas.toDataURL('image/webp', 0.9);
+        // Dapatkan Foto dalam bentuk Blob
+        const photoBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 1.0));
 
-        // 3. TUNGGU 2 detik agar kamera merekam masa depan
-        document.querySelector('.live-indicator').style.color = "red"; // Indikator merekam
+        // 3. AMBIL BUFFER VIDEO (SEBELUM)
+        let preChunks = window.BufferManager.extractBuffer();
+
+        // 4. LANJUT REKAM VIDEO (SESUDAH) - Tunggu 2 Detik
         await new Promise(resolve => setTimeout(resolve, 2000));
-        document.querySelector('.live-indicator').style.color = "var(--accent)";
+        
+        // Ambil sisa buffer yang terekam selama 2 detik penantian di atas
+        let postChunks = window.BufferManager.extractBuffer(); 
+        
+        // 5. GABUNGKAN CHUNKS (LiveShot Video)
+        // Karena MediaRecorder berjalan terus, chunk ini linear dan valid disatukan
+        let allChunks = [...new Set([...preChunks, ...postChunks])]; // Hindari duplikasi referensi
+        const videoBlob = new Blob(allChunks, { type: 'video/webm' });
 
-        // 4. Ambil semua buffer (yang berisi 2-3 detik SEBELUM dan 2 detik SESUDAH shutter)
-        const videoBlob = await liveBuffer.getCompiledBlob();
+        // 6. SIMPAN KE INDEXEDDB
+        const shotId = 'LIVESHOT_' + Date.now();
+        await window.StorageDB.saveLiveShot(shotId, photoBlob, videoBlob, {
+            width: canvas.width,
+            height: canvas.height,
+            isHDRSimulated: true
+        });
 
-        // 5. Simpan ke Database
-        const shotData = {
-            id: Date.now(),
-            date: new Date().toISOString(),
-            photo: photoDataUrl,
-            video: videoBlob
-        };
-
-        await storage.saveShot(shotData);
+        // Update UI
+        document.body.classList.remove('is-capturing');
+        isCapturing = false;
         
         // Update Thumbnail Gallery
-        document.getElementById('btn-gallery').style.backgroundImage = `url(${photoDataUrl})`;
-    }
-}
+        const thumbUrl = URL.createObjectURL(photoBlob);
+        document.getElementById('btn-gallery').style.backgroundImage = `url(${thumbUrl})`;
+        document.getElementById('btn-gallery').style.backgroundSize = 'cover';
 
-const capture = new CaptureSystem();
+        console.log(`✅ LiveShot Disimpan: ${shotId}`);
+    };
+
+    return { takeLiveShot };
+})();

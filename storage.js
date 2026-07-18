@@ -1,53 +1,44 @@
-// storage.js
-class StorageSystem {
-    constructor() {
-        this.dbName = 'LiveShotDB';
-        this.dbVersion = 1;
-        this.db = null;
-    }
+// storage.js - IndexedDB wrapper
+window.StorageDB = (() => {
+    const DB_NAME = 'XAERISOFT_DB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'liveshots';
+    let db;
 
-    init() {
+    const init = () => {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, this.dbVersion);
-
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = (e) => reject('IndexedDB error: ' + e.target.error);
+            request.onsuccess = (e) => { db = e.target.result; resolve(true); };
             request.onupgradeneeded = (e) => {
-                this.db = e.target.result;
-                if (!this.db.objectStoreNames.contains('shots')) {
-                    this.db.createObjectStore('shots', { keyPath: 'id' });
+                let tempDb = e.target.result;
+                if (!tempDb.objectStoreNames.contains(STORE_NAME)) {
+                    tempDb.createObjectStore(STORE_NAME, { keyPath: 'id' });
                 }
             };
-
-            request.onsuccess = (e) => {
-                this.db = e.target.result;
-                resolve();
-            };
-
-            request.onerror = (e) => reject(e);
         });
-    }
+    };
 
-    async saveShot(data) {
+    const saveLiveShot = (id, photoBlob, videoBlob, metadata) => {
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(['shots'], 'readwrite');
-            const store = transaction.objectStore('shots');
-            const request = store.add(data);
-            request.onsuccess = () => resolve();
-            request.onerror = (e) => reject(e);
+            const tx = db.transaction([STORE_NAME], 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const item = { id, photoBlob, videoBlob, timestamp: Date.now(), ...metadata };
+            store.add(item);
+            tx.oncomplete = () => resolve(item);
+            tx.onerror = () => reject(tx.error);
         });
-    }
+    };
 
-    async getAllShots() {
+    const getAllLiveShots = () => {
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(['shots'], 'readonly');
-            const store = transaction.objectStore('shots');
+            const tx = db.transaction([STORE_NAME], 'readonly');
+            const store = tx.objectStore(STORE_NAME);
             const request = store.getAll();
-            request.onsuccess = () => {
-                // Urutkan dari yang terbaru
-                resolve(request.result.sort((a, b) => b.id - a.id));
-            };
-            request.onerror = (e) => reject(e);
+            request.onsuccess = () => resolve(request.result.sort((a,b) => b.timestamp - a.timestamp));
+            request.onerror = () => reject(request.error);
         });
-    }
-}
+    };
 
-const storage = new StorageSystem();
+    return { init, saveLiveShot, getAllLiveShots };
+})();

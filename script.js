@@ -47,68 +47,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert("Akses kamera ditolak.");
     }
 
-    // 2. Continuous Ring Buffer (Berjalan Selamanya)
+    // 2. Continuous Ring Buffer
     async function cameraLoop(timestamp) {
         if (timestamp - lastDrawTime >= FRAME_INTERVAL) {
             lastDrawTime = timestamp;
-            
-            // Gambar frame kamera ke viewfinder
             ctx.drawImage(videoCam, 0, 0, canvas.width, canvas.height);
-            
-            // Simpan ke memori (Sangat Ringan, 0 Delay)
             const bitmap = await createImageBitmap(canvas);
 
             if (isCapturing) {
-                // Jika sedang post-shutter, kumpulkan frame berikutnya
                 postCaptureFrames.push(bitmap);
                 if (postCaptureFrames.length >= POST_FRAMES) {
                     finalizeLivePhoto();
                 }
             } else {
-                // Jika standby, maintenance Ring Buffer
                 ringBuffer.push(bitmap);
                 if (ringBuffer.length > PRE_FRAMES) {
                     const oldFrame = ringBuffer.shift();
-                    oldFrame.close(); // Hapus dari RAM (Wajib!)
+                    oldFrame.close();
                 }
             }
         }
         requestAnimationFrame(cameraLoop);
     }
 
-    // 3. Shutter Ditekan (Shutter Experience Apple Live Photo)
+    // 3. Shutter Ditekan
     btnShutter.addEventListener('click', async () => {
         if (isCapturing) return;
 
-        // --- MULAI EFEK SHUTTER INSTAN ---
-        
-        // 1. Audio (Sangat sinkron dengan Key Frame)
         shutterSound.currentTime = 0;
         shutterSound.play().catch(e => console.log("Audio play error:", e));
 
-        // 2. Getaran / Haptic (8-10ms)
         if (navigator.vibrate) navigator.vibrate(10);
 
-        // 3. Flash Putih (via CSS Class - Sinkronisasi durasi 150ms dengan CSS animation)
         flashOverlay.classList.add('flash-active');
         setTimeout(() => flashOverlay.classList.remove('flash-active'), 150);
 
-        // 4. Viewfinder Mengecil (via CSS Class - Sinkronisasi durasi 250ms dengan CSS animation)
         canvas.classList.add('shutter-shrink');
         setTimeout(() => canvas.classList.remove('shutter-shrink'), 250);
-        
-        // --- SELESAI EFEK SHUTTER ---
 
-        // Kunci State saat ini
         isCapturing = true;
-        
-        // Frame ini menjadi Key Photo (Thumbnail)
         livePhotoData.key = await createImageBitmap(canvas);
-        
-        // Pindahkan Ring Buffer ke data pre-shutter
         livePhotoData.pre = [...ringBuffer];
-        ringBuffer = []; // Kosongkan buffer untuk iterasi selanjutnya
-        
+        ringBuffer = [];
         postCaptureFrames = [];
     });
 
@@ -116,18 +96,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     function finalizeLivePhoto() {
         isCapturing = false;
         livePhotoData.post = [...postCaptureFrames];
-        
-        // Langsung tampilkan hasil secara bersih
         resultView.classList.remove('hidden');
         
-        // --- LANGSUNG PUTAR OTOMATIS SATU KALI ---
         startPlayback();
-
-        // Jalankan background encoder (Tidak ganggu UI)
-        encodeVideoBackground();
+        encodeVideoBackground(); // Proses pemanggangan dimulai di background
     }
 
-    // 5. Playback Logic (Identik Apple: Auto-play 1x, blend to Key Photo, Tap/Hold untuk ulang)
+    // 5. Playback Logic di Layar (Interactive Canvas View)
     let isPlaying = false;
     let playbackAnimationId = null;
     let crossfadeId = null;
@@ -136,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isPlaying) return;
         isPlaying = true;
         
-        // Batalkan transisi fade jika user menekan layar saat foto sedang kembali ke posisi diam
         if (crossfadeId) {
             cancelAnimationFrame(crossfadeId);
             crossfadeId = null;
@@ -151,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!isPlaying) return; 
             
             if (timestamp - lastPlayTime >= FRAME_INTERVAL) {
-                // Gambar frame dengan opacity solid
                 playCtx.globalAlpha = 1;
                 playCtx.drawImage(allFrames[frameIndex], 0, 0);
                 frameIndex++;
@@ -161,7 +134,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (frameIndex < allFrames.length) {
                 playbackAnimationId = requestAnimationFrame(playLoop);
             } else {
-                // Selesai memutar 1 kali -> Lakukan smooth crossfade ke Key Photo persis seperti iOS
                 stopPlayback(); 
             }
         }
@@ -175,52 +147,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (playbackAnimationId) cancelAnimationFrame(playbackAnimationId);
         playbackAnimationId = null;
         
-        // --- ILUSI APPLE: Crossfade / Ease back ke Key Photo ---
-        // Simpan frame terakhir yang sedang tampil di layar sebagai background
         const currentFrameCanvas = document.createElement('canvas');
         currentFrameCanvas.width = canvas.width;
         currentFrameCanvas.height = canvas.height;
         currentFrameCanvas.getContext('2d', { alpha: false }).drawImage(playbackCanvas, 0, 0);
 
         let startTime = performance.now();
-        const duration = 250; // 250ms ease-out crossfade (Timing standar transisi UI iOS)
+        const duration = 250; 
 
         function fadeBack(timestamp) {
             let elapsed = timestamp - startTime;
             let progress = Math.min(elapsed / duration, 1);
-            
-            // Cubic ease-out untuk meminimalisir kesan mekanis/linear
             let ease = 1 - Math.pow(1 - progress, 3);
             
-            // Tahan frame terakhir di belakang
             playCtx.globalAlpha = 1;
             playCtx.drawImage(currentFrameCanvas, 0, 0);
             
-            // Timpa dengan Key Photo yang memudar masuk perlahan
             playCtx.globalAlpha = ease;
             playCtx.drawImage(livePhotoData.key, 0, 0);
             
             if (progress < 1) {
                 crossfadeId = requestAnimationFrame(fadeBack);
             } else {
-                playCtx.globalAlpha = 1; // Reset state
+                playCtx.globalAlpha = 1;
                 crossfadeId = null;
             }
         }
         crossfadeId = requestAnimationFrame(fadeBack);
     }
 
-    // Gesture Handling
     playbackCanvas.addEventListener('pointerdown', startPlayback);
     window.addEventListener('pointerup', stopPlayback);
     playbackCanvas.addEventListener('pointerleave', stopPlayback);
 
-    // 6. Background Encoding (WebCodecs) - Valid & Bebas MediaRecorder
+    // 6. ADVANCED BACKGROUND ENCODING (Memanggang Sensasi Live Photo langsung ke File Video)
     async function encodeVideoBackground() {
         btnDownload.disabled = true;
         btnDownload.innerText = "Memproses...";
         
-        const allFrames = [...livePhotoData.pre, livePhotoData.key, ...livePhotoData.post];
+        const preFrames = livePhotoData.pre;
+        const keyFrame = livePhotoData.key;
+        const postFrames = livePhotoData.post;
+        const mainFrames = [...preFrames, keyFrame, ...postFrames];
         
         const muxer = new WebMMuxer.Muxer({
             target: new WebMMuxer.ArrayBufferTarget(),
@@ -233,17 +201,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         videoEncoder.configure({
-            codec: 'vp8', width: canvas.width, height: canvas.height, bitrate: 2000000, framerate: FPS
+            codec: 'vp8', width: canvas.width, height: canvas.height, bitrate: 2500000, framerate: FPS
         });
 
-        // Encode seluruh frame dari RAM ke Muxer
-        for (let i = 0; i < allFrames.length; i++) {
-            // Konversi ImageBitmap ke VideoFrame API
-            const vf = new VideoFrame(allFrames[i], { timestamp: i * FRAME_INTERVAL * 1000 });
-            videoEncoder.encode(vf, { keyFrame: i % 30 === 0 });
+        let currentTimestamp = 0;
+        let frameCount = 0;
+
+        // Helper untuk memasukkan frame ke pipa WebCodecs secara berurutan
+        const pushToEncoder = async (imageSource) => {
+            const vf = new VideoFrame(imageSource, { timestamp: currentTimestamp });
+            videoEncoder.encode(vf, { keyFrame: frameCount % 30 === 0 });
             vf.close();
+            currentTimestamp += FRAME_INTERVAL * 1000; // Microseconds
+            frameCount++;
+        };
+
+        // KELOMPOK 1: Panggang gerakan asli (Pre -> Key -> Post)
+        for (let i = 0; i < mainFrames.length; i++) {
+            await pushToEncoder(mainFrames[i]);
         }
 
+        // KELOMPOK 2: Panggang Transisi Crossfade (Ilusi visual kembali ke Key Photo secara anggun)
+        const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
+        const oCtx = offscreen.getContext('2d', { alpha: false });
+        const lastMotionFrame = mainFrames[mainFrames.length - 1];
+
+        const fadeDuration = 250; // 250ms transisi balik
+        const fadeFramesCount = Math.round(fadeDuration / FRAME_INTERVAL); // ~7 sampai 8 frame
+
+        for (let i = 0; i <= fadeFramesCount; i++) {
+            let progress = i / fadeFramesCount;
+            let ease = 1 - Math.pow(1 - progress, 3); // Kurva cubic ease-out Apple
+
+            oCtx.globalAlpha = 1;
+            oCtx.drawImage(lastMotionFrame, 0, 0); // Base layer (frame terakhir berhenti)
+            oCtx.globalAlpha = ease;
+            oCtx.drawImage(keyFrame, 0, 0);       // Blend layer (Key Photo masuk)
+
+            const blendedBitmap = await createImageBitmap(offscreen);
+            await pushToEncoder(blendedBitmap);
+            blendedBitmap.close();
+        }
+
+        // KELOMPOK 3: Panggang Static Freeze (Menahan Key Photo agar diam selama 1.5 detik di akhir)
+        const holdFramesCount = Math.round(1500 / FRAME_INTERVAL); // 45 frame diam
+        for (let i = 0; i < holdFramesCount; i++) {
+            await pushToEncoder(keyFrame);
+        }
+
+        // Finalisasi data video
         await videoEncoder.flush();
         muxer.finalize();
         
@@ -265,10 +271,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 8. Tutup dan Bersihkan Memori
     btnBack.addEventListener('click', () => {
-        stopPlayback(); // Pastikan animasi berhenti jika ditutup saat sedang jalan
+        stopPlayback();
         resultView.classList.add('hidden');
         
-        // Bebaskan RAM
         [...livePhotoData.pre, ...livePhotoData.post].forEach(bmp => {
             if(bmp && !bmp.isClosed) bmp.close();
         });

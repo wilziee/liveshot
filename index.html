@@ -3,20 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>📸 Foto Live Trend</title>
+    <title>Apple Live Photo Clone</title>
     <link rel="stylesheet" href="style.css">
+    <!-- WebM Muxer untuk packaging background tanpa MediaRecorder -->
+    <script src="https://unpkg.com/webm-muxer/build/webm-muxer.js"></script>
 </head>
 <body>
     <div id="app-container">
-        <!-- Kamera Asli disembunyikan, kita pakai Canvas untuk meniru layarnya -->
-        <video id="hidden-camera" autoplay playsinline muted style="display: none;"></video>
+        <!-- Source Stream (Hidden) -->
+        <video id="hidden-camera" autoplay playsinline muted></video>
         
-        <!-- Viewfinder Utama (Yang direkam) -->
+        <!-- Live Viewfinder -->
         <canvas id="viewfinder"></canvas>
+        
+        <!-- Flash Overlay -->
+        <div id="flash-overlay"></div>
         
         <!-- UI Elements -->
         <div id="ui-layer">
-            <div id="status-text">Siap Merekam</div>
+            <div id="status-badge">LIVE</div>
             
             <div class="bottom-bar">
                 <button id="btn-shutter">
@@ -25,14 +30,17 @@
             </div>
         </div>
 
-        <!-- Modal Hasil Video -->
-        <div id="result-modal" class="hidden">
-            <div class="modal-header">
-                <h2>Hasil "Foto Live"</h2>
-                <button id="btn-close-modal">Tutup</button>
+        <!-- Result / Playback View -->
+        <div id="result-view" class="hidden">
+            <div class="header">
+                <button id="btn-back">Tutup</button>
+                <div class="hint">Tekan & Tahan untuk melihat</div>
             </div>
-            <video id="result-video" autoplay loop playsinline controls></video>
-            <button id="btn-download">⬇ Download Video Ini</button>
+            
+            <!-- Playback menggunakan Canvas untuk respons 0ms -->
+            <canvas id="playback-canvas"></canvas>
+            
+            <button id="btn-download">Download Live Photo</button>
         </div>
     </div>
 

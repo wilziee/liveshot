@@ -1,131 +1,24 @@
-:root {
-    --bg-dark: #000;
-    --live-yellow: #ffcc00;
-}
-
+:root { --bg-dark: #000; --live-yellow: #ffcc00; }
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-
-body, html {
-    width: 100%; height: 100%;
-    background-color: var(--bg-dark);
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    overflow: hidden; touch-action: none;
-}
-
-#app-container {
-    position: relative; width: 100%; height: 100%;
-}
-
+body, html { width: 100%; height: 100%; background-color: var(--bg-dark); font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; touch-action: none; }
+#app-container { position: relative; width: 100%; height: 100%; }
 #hidden-camera { display: none; }
-
-#viewfinder, #playback-canvas {
-    position: absolute;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 1;
-}
-
-#flash-overlay {
-    position: absolute; width: 100%; height: 100%;
-    background: white; opacity: 0; z-index: 5;
-    pointer-events: none; transition: opacity 0.3s ease-out;
-}
-
-#ui-layer {
-    position: absolute; width: 100%; height: 100%;
-    z-index: 10; display: flex; flex-direction: column;
-    justify-content: space-between; pointer-events: none;
-}
-
-#status-badge {
-    align-self: center; margin-top: 50px;
-    background: rgba(0,0,0,0.5); color: var(--live-yellow);
-    padding: 4px 12px; border-radius: 4px;
-    font-size: 14px; font-weight: 600; letter-spacing: 1px;
-}
-
-.bottom-bar {
-    width: 100%; padding-bottom: 60px;
-    display: flex; justify-content: center; pointer-events: auto;
-}
-
-#btn-shutter {
-    width: 72px; height: 72px; border-radius: 50%;
-    background: transparent; border: 4px solid white;
-    display: flex; justify-content: center; align-items: center;
-    cursor: pointer; transition: opacity 0.1s;
-}
-
-#btn-shutter:active { opacity: 0.6; }
-
-/* Animasi Tombol Shutter (Spring Feel) */
-.shutter-inner {
-    width: 54px; height: 54px; border-radius: 50%;
-    background: white;
-    transition: transform 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-#btn-shutter:active .shutter-inner {
-    transform: scale(0.82);
-    transition: transform 0.05s ease-out;
-}
-
-/* Result View */
-#result-view {
-    position: absolute; width: 100%; height: 100%;
-    background: var(--bg-dark); z-index: 100;
-    display: flex; flex-direction: column;
-}
-
+#viewfinder, #playback-canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+#flash-overlay { position: absolute; width: 100%; height: 100%; background: white; opacity: 0; z-index: 5; pointer-events: none; transition: opacity 0.3s ease-out; }
+#ui-layer { position: absolute; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+#status-badge { align-self: center; margin-top: 50px; background: rgba(0,0,0,0.5); color: var(--live-yellow); padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+.bottom-bar { width: 100%; padding-bottom: 80px; display: flex; justify-content: center; pointer-events: auto; }
+#btn-shutter { width: 72px; height: 72px; border-radius: 50%; background: transparent; border: 4px solid white; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: opacity 0.1s; }
+.shutter-inner { width: 54px; height: 54px; border-radius: 50%; background: white; transition: transform 0.15s cubic-bezier(0.25, 0.1, 0.25, 1); }
+#btn-shutter:active .shutter-inner { transform: scale(0.82); }
+#wilxd-footer { position: absolute; bottom: 20px; width: 100%; text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 12px; font-weight: 500; letter-spacing: 1px; z-index: 10; }
+#result-view { position: absolute; width: 100%; height: 100%; background: var(--bg-dark); z-index: 100; display: flex; flex-direction: column; }
 #result-view.hidden { display: none; }
-
-#result-view .header {
-    position: absolute; top: 0; width: 100%; z-index: 101;
-    display: flex; justify-content: space-between; padding: 20px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
-}
-
+#result-view .header { position: absolute; top: 0; width: 100%; z-index: 101; display: flex; justify-content: space-between; padding: 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent); }
 #btn-back { background: none; border: none; color: white; font-size: 18px; cursor: pointer; }
 .hint { color: white; font-size: 14px; align-self: center; opacity: 0.8; }
-
-#btn-download {
-    position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-    z-index: 101; padding: 12px 24px; border-radius: 20px;
-    background: white; color: black; font-weight: bold; border: none; cursor: pointer;
-}
-#btn-download:disabled { opacity: 0.5; }
-
-/* Efek Flash Instan Apple (Asimetris: Cepat muncul, lambat hilang) */
-.flash-active {
-    animation: flash-blink 0.15s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
-
-@keyframes flash-blink {
-    0% { opacity: 0; }
-    15% { opacity: 0.85; background: #ffffff; }
-    100% { opacity: 0; }
-}
-
-/* Animasi Viewfinder Shrink (Apple Haptic Zoom Illusion) */
-.shutter-shrink {
-    animation: viewfinder-shrink 0.25s cubic-bezier(0.3, 0.8, 0.2, 1) forwards;
-}
-
-@keyframes viewfinder-shrink {
-    0% { transform: scale(1); }
-    20% { transform: scale(0.985); }
-    100% { transform: scale(1); }
-}
-/* --- Footer Wilxd --- */
-#wilxd-footer {
-    position: absolute;
-    bottom: 20px; /* Jarak dari bawah layar */
-    width: 100%;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.5); /* Warna putih transparan agar elegan dan tidak mencolok */
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 1px;
-    pointer-events: none; /* Supaya kalau teksnya kepencet, layarnya tetep ngerespons */
-    z-index: 10;
-}
+#btn-download { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 101; padding: 12px 24px; border-radius: 20px; background: white; color: black; font-weight: bold; border: none; cursor: pointer; }
+.flash-active { animation: flash-blink 0.15s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+@keyframes flash-blink { 0% { opacity: 0; } 15% { opacity: 0.85; background: #ffffff; } 100% { opacity: 0; } }
+.shutter-shrink { animation: viewfinder-shrink 0.25s cubic-bezier(0.3, 0.8, 0.2, 1) forwards; }
+@keyframes viewfinder-shrink { 0% { transform: scale(1); } 20% { transform: scale(0.985); } 100% { transform: scale(1); } }

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📸 XAERISOFT LIVESHOT</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- App Container -->
+    <main id="app">
+        <!-- Viewfinder Kamera -->
+        <video id="viewfinder" autoplay playsinline muted></video>
+        
+        <!-- Flash Effect -->
+        <div id="flash-overlay"></div>
+
+        <!-- UI Overlay: Top Controls -->
+        <header class="glass-header">
+            <button id="btn-flash" class="icon-btn">⚡</button>
+            <div class="live-indicator">LIVE</div>
+            <button id="btn-switch-cam" class="icon-btn">🔄</button>
+        </header>
+
+        <!-- UI Overlay: Bottom Controls -->
+        <footer class="glass-footer">
+            <button id="btn-gallery" class="thumbnail-btn"></button>
+            <div class="shutter-container">
+                <button id="btn-shutter">
+                    <div class="shutter-inner"></div>
+                </button>
+            </div>
+            <button id="btn-settings" class="icon-btn">⚙️</button>
+        </footer>
+
+        <!-- Player / Gallery Overlay (Hidden by default) -->
+        <section id="gallery-view" class="hidden glass-panel">
+            <header class="gallery-header">
+                <button id="btn-close-gallery">Tutup</button>
+                <h2>Galeri Foto Live</h2>
+                <button id="btn-export">Ekspor</button>
+            </header>
+            
+            <div id="player-container">
+                <img id="player-image" src="" alt="LiveShot">
+                <video id="player-video" playsinline muted loop class="hidden"></video>
+                <div class="hold-hint">Tekan & Tahan untuk Live</div>
+            </div>
+
+            <div id="gallery-grid"></div>
+        </section>
+    </main>
+
+    <!-- Modul JavaScript (Urutan Penting) -->
+    <script src="storage.js"></script>
+    <script src="buffer.js"></script>
+    <script src="camera.js"></script>
+    <script src="capture.js"></script>
+    <script src="player.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

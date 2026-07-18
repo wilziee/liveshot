@@ -1,0 +1,214 @@
+:root {
+    --bg-dark: #000000;
+    --glass-bg: rgba(25, 25, 25, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --accent: #ffd60a;
+    --text: #ffffff;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-dark);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    color: var(--text);
+}
+
+#app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Kamera & Efek */
+#viewfinder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+#flash-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    opacity: 0;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.1s ease-out;
+}
+
+/* Glassmorphism UI */
+.glass-header, .glass-footer {
+    position: absolute;
+    width: 100%;
+    z-index: 5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-header { top: 0; border-bottom: 1px solid var(--glass-border); }
+.glass-footer { bottom: 0; padding-bottom: 40px; border-top: 1px solid var(--glass-border); }
+
+/* Kontrol UI */
+.icon-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    color: white;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s;
+}
+
+.icon-btn:active { transform: scale(0.9); }
+
+.live-indicator {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 10px rgba(255, 214, 10, 0.3);
+}
+
+/* Tombol Shutter Premium */
+.shutter-container {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    border: 3px solid white;
+}
+
+#btn-shutter {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+#btn-shutter:active {
+    width: 50px;
+    height: 50px;
+    background: #e0e0e0;
+}
+
+.thumbnail-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    border: 1px solid white;
+    background-size: cover;
+    background-color: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+}
+
+/* Galeri & Player */
+.glass-panel {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.3s ease;
+}
+
+.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.gallery-header {
+    display: flex; justify-content: space-between; padding: 20px;
+}
+.gallery-header button {
+    background: none; border: none; color: var(--accent); font-size: 16px; cursor: pointer;
+}
+
+#player-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+#player-image, #player-video {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: opacity 0.3s ease;
+}
+
+.hold-hint {
+    position: absolute;
+    top: 20px;
+    background: rgba(0,0,0,0.6);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+#gallery-grid {
+    height: 120px;
+    display: flex;
+    overflow-x: auto;
+    padding: 10px;
+    gap: 10px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.gallery-item {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+.gallery-item.active { border-color: var(--accent); }

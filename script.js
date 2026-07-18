@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let livePhotoData = { pre: [], key: null, post: [] };
     
     let lastDrawTime = 0;
-    let playbackAnimationId = null;
     let finalVideoBlob = null;
 
     // Audio Shutter (Preload untuk respon 0ms)
@@ -90,13 +89,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 2. Getaran / Haptic (8-10ms)
         if (navigator.vibrate) navigator.vibrate(10);
 
-        // 3. Flash Putih (via CSS Class - 80ms)
+        // 3. Flash Putih (via CSS Class - Sinkronisasi durasi 150ms dengan CSS animation)
         flashOverlay.classList.add('flash-active');
-        setTimeout(() => flashOverlay.classList.remove('flash-active'), 100);
+        setTimeout(() => flashOverlay.classList.remove('flash-active'), 150);
 
-        // 4. Viewfinder Mengecil 0.98x (via CSS Class - 120ms)
+        // 4. Viewfinder Mengecil (via CSS Class - Sinkronisasi durasi 250ms dengan CSS animation)
         canvas.classList.add('shutter-shrink');
-        setTimeout(() => canvas.classList.remove('shutter-shrink'), 150);
+        setTimeout(() => canvas.classList.remove('shutter-shrink'), 250);
         
         // --- SELESAI EFEK SHUTTER ---
 
@@ -128,21 +127,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         encodeVideoBackground();
     }
 
-    // 5. Playback Logic (Identik Apple: Auto-play 1x, berhenti di Key Photo, Tap/Hold untuk ulang)
+    // 5. Playback Logic (Identik Apple: Auto-play 1x, blend to Key Photo, Tap/Hold untuk ulang)
     let isPlaying = false;
+    let playbackAnimationId = null;
+    let crossfadeId = null;
     
     function startPlayback() {
         if (isPlaying) return;
         isPlaying = true;
+        
+        // Batalkan transisi fade jika user menekan layar saat foto sedang kembali ke posisi diam
+        if (crossfadeId) {
+            cancelAnimationFrame(crossfadeId);
+            crossfadeId = null;
+            playCtx.globalAlpha = 1;
+        }
         
         const allFrames = [...livePhotoData.pre, livePhotoData.key, ...livePhotoData.post];
         let frameIndex = 0;
         let lastPlayTime = performance.now();
 
         function playLoop(timestamp) {
-            if (!isPlaying) return; // Batal/mati instan jika dilepas di tengah-tengah
+            if (!isPlaying) return; 
             
             if (timestamp - lastPlayTime >= FRAME_INTERVAL) {
+                // Gambar frame dengan opacity solid
+                playCtx.globalAlpha = 1;
                 playCtx.drawImage(allFrames[frameIndex], 0, 0);
                 frameIndex++;
                 lastPlayTime = timestamp;
@@ -151,24 +161,56 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (frameIndex < allFrames.length) {
                 playbackAnimationId = requestAnimationFrame(playLoop);
             } else {
-                // Selesai memutar 1 kali -> Langsung berhenti tepat di Key Photo
-                isPlaying = false;
-                playCtx.drawImage(livePhotoData.key, 0, 0);
+                // Selesai memutar 1 kali -> Lakukan smooth crossfade ke Key Photo persis seperti iOS
+                stopPlayback(); 
             }
         }
         playbackAnimationId = requestAnimationFrame(playLoop);
     }
 
     function stopPlayback() {
-        if (!isPlaying) return;
+        if (!isPlaying && !playbackAnimationId) return;
         isPlaying = false;
-        cancelAnimationFrame(playbackAnimationId);
         
-        // Instan: Snap/Kembali ke Key Photo
-        playCtx.drawImage(livePhotoData.key, 0, 0);
+        if (playbackAnimationId) cancelAnimationFrame(playbackAnimationId);
+        playbackAnimationId = null;
+        
+        // --- ILUSI APPLE: Crossfade / Ease back ke Key Photo ---
+        // Simpan frame terakhir yang sedang tampil di layar sebagai background
+        const currentFrameCanvas = document.createElement('canvas');
+        currentFrameCanvas.width = canvas.width;
+        currentFrameCanvas.height = canvas.height;
+        currentFrameCanvas.getContext('2d', { alpha: false }).drawImage(playbackCanvas, 0, 0);
+
+        let startTime = performance.now();
+        const duration = 250; // 250ms ease-out crossfade (Timing standar transisi UI iOS)
+
+        function fadeBack(timestamp) {
+            let elapsed = timestamp - startTime;
+            let progress = Math.min(elapsed / duration, 1);
+            
+            // Cubic ease-out untuk meminimalisir kesan mekanis/linear
+            let ease = 1 - Math.pow(1 - progress, 3);
+            
+            // Tahan frame terakhir di belakang
+            playCtx.globalAlpha = 1;
+            playCtx.drawImage(currentFrameCanvas, 0, 0);
+            
+            // Timpa dengan Key Photo yang memudar masuk perlahan
+            playCtx.globalAlpha = ease;
+            playCtx.drawImage(livePhotoData.key, 0, 0);
+            
+            if (progress < 1) {
+                crossfadeId = requestAnimationFrame(fadeBack);
+            } else {
+                playCtx.globalAlpha = 1; // Reset state
+                crossfadeId = null;
+            }
+        }
+        crossfadeId = requestAnimationFrame(fadeBack);
     }
 
-    // Event Listener untuk gesture Hold/Tap (Jika user ingin mengulang/melihat lagi)
+    // Gesture Handling
     playbackCanvas.addEventListener('pointerdown', startPlayback);
     window.addEventListener('pointerup', stopPlayback);
     playbackCanvas.addEventListener('pointerleave', stopPlayback);

@@ -111,8 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         ringBuffer = []; // Kosongkan buffer untuk iterasi selanjutnya
         
         postCaptureFrames = [];
-        
-        // DONE! UI kembali normal. Sisa post-shutter berjalan invisible di cameraLoop.
     });
 
     // 4. Finalisasi Memori & Tampilkan Hasil
@@ -120,7 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         isCapturing = false;
         livePhotoData.post = [...postCaptureFrames];
         
-        // Tampilkan Modal Hasil
+        // Langsung tampilkan hasil secara bersih tanpa memicu teks penahan/loading tambahan
         resultView.classList.remove('hidden');
         
         // Gambar Key Photo persis seperti saat shutter ditekan
@@ -217,7 +215,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         a.href = URL.createObjectURL(finalVideoBlob);
         a.download = `LivePhoto_${Date.now()}.webm`;
         a.click();
-        // Jangan pernah revoke ObjectURL di sini untuk mencegah bug download gagal di iOS
     });
 
     // 8. Tutup dan Bersihkan Memori

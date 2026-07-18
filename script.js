@@ -27,6 +27,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let playbackAnimationId = null;
     let finalVideoBlob = null;
 
+    // Audio Shutter (Preload untuk respon 0ms)
+    const shutterSound = new Audio('https://www.soundjay.com/mechanical/camera-shutter-click-01.mp3');
+    shutterSound.preload = 'auto';
+
     // 1. Setup Kamera
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -73,13 +77,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         requestAnimationFrame(cameraLoop);
     }
 
-    // 3. Shutter Ditekan (Instan <30ms)
+    // 3. Shutter Ditekan (Shutter Experience Apple Live Photo)
     btnShutter.addEventListener('click', async () => {
         if (isCapturing) return;
+
+        // --- MULAI EFEK SHUTTER INSTAN ---
         
-        // Visual Feedback Instan
-        flashOverlay.style.opacity = '1';
-        setTimeout(() => flashOverlay.style.opacity = '0', 50);
+        // 1. Audio (Sangat sinkron dengan Key Frame)
+        shutterSound.currentTime = 0;
+        shutterSound.play().catch(e => console.log("Audio play error:", e));
+
+        // 2. Getaran / Haptic (8-10ms)
+        if (navigator.vibrate) navigator.vibrate(10);
+
+        // 3. Flash Putih (via CSS Class - 80ms)
+        flashOverlay.classList.add('flash-active');
+        setTimeout(() => flashOverlay.classList.remove('flash-active'), 100);
+
+        // 4. Viewfinder Mengecil 0.98x (via CSS Class - 120ms)
+        canvas.classList.add('shutter-shrink');
+        setTimeout(() => canvas.classList.remove('shutter-shrink'), 150);
+        
+        // --- SELESAI EFEK SHUTTER ---
 
         // Kunci State saat ini
         isCapturing = true;

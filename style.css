@@ -87,3 +87,30 @@ body, html {
     background: white; color: black; font-weight: bold; border: none; cursor: pointer;
 }
 #btn-download:disabled { opacity: 0.5; }
+/* Efek Flash Instan (70-90ms) */
+.flash-active {
+    animation: flash-blink 0.08s linear forwards;
+}
+
+@keyframes flash-blink {
+    0% { opacity: 0; }
+    50% { opacity: 0.9; }
+    100% { opacity: 0; }
+}
+
+/* Animasi Viewfinder Shrink (120ms) */
+.shutter-shrink {
+    animation: viewfinder-shrink 0.12s ease-out forwards;
+}
+
+@keyframes viewfinder-shrink {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+}
+
+/* Animasi Tombol Shutter */
+#btn-shutter:active .shutter-inner {
+    transform: scale(0.85);
+    transition: transform 0.05s ease-out;
+}

@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('pointerup', stopPlayback);
     playbackCanvas.addEventListener('pointerleave', stopPlayback);
 
-    // 6. RENDER ENGINE (PERBAIKAN KECEPATAN & ANTI-FREEZE)
+    // 6. RENDER ENGINE (PERBAIKAN KECEPATAN & KEMBALIKAN EFEK JEDA KHAS LIVE PHOTO)
     async function encodeVideoBackground() {
         isEncoding = true;
         abortEncoding = false;
@@ -253,10 +253,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnDownload.innerText = "Memproses Video (0%)...";
         
         const mainFrames = [...livePhotoData.pre, livePhotoData.key, ...livePhotoData.post];
-        const totalFrames = mainFrames.length;
+        
+        // Kalkulasi total frame agar persentase loading akurat
+        const fadeFramesCount = Math.round(250 / FRAME_INTERVAL); // Transisi 250ms
+        const holdFramesCount = Math.round(1500 / FRAME_INTERVAL); // Jeda diam 1,5 detik
+        const absoluteTotalFrames = mainFrames.length + fadeFramesCount + holdFramesCount;
         
         // Mencegah HP Freeze: Downscale video menjadi maksimal ukuran 720p 
-        // (Sisi terpanjang diset max 1280px)
         const maxDim = Math.max(canvas.width, canvas.height);
         const scale = maxDim > 1280 ? (1280 / maxDim) : 1;
         const encWidth = Math.floor((canvas.width * scale) / 2) * 2;
@@ -275,45 +278,79 @@ document.addEventListener('DOMContentLoaded', async () => {
             error: e => console.error("Encoder Error", e)
         });
 
-        // Bitrate diturunkan ke 3.5 Mbps (Cukup tajam untuk format video 720p di HP)
+        // Bitrate 3.5 Mbps (Cukup tajam untuk 720p dan cepat diproses HP)
         videoEncoder.configure({
             codec: 'vp8', width: encWidth, height: encHeight, bitrate: 3500000, framerate: FPS
         });
 
         let currentTimestamp = 0;
         let frameCount = 0;
+        let framesProcessed = 0;
 
         const pushToEncoder = async (imageSource) => {
-            // Berhenti merender jika tombol tutup ditekan atau gambar sudah terhapus
-            if (abortEncoding || !imageSource || imageSource.isClosed) return;
+            if (abortEncoding || !imageSource) return;
             
-            // Batasi antrean ke GPU agar RAM HP tidak penuh
+            // Tahan antrean jika memori mau penuh
             while (videoEncoder.encodeQueueSize >= 3) {
                 await new Promise(resolve => setTimeout(resolve, 15));
             }
 
-            // Gambar ulang ke ukuran 720p sebelum di-encode (kunci agar proses instan)
+            encodeCtx.globalAlpha = 1;
             encodeCtx.drawImage(imageSource, 0, 0, encWidth, encHeight);
             
             const vf = new VideoFrame(encodeCanvas, { timestamp: currentTimestamp });
             videoEncoder.encode(vf, { keyFrame: frameCount % 30 === 0 });
             vf.close();
+            
             currentTimestamp += FRAME_INTERVAL * 1000;
             frameCount++;
+            framesProcessed++;
+
+            // Update persentase di tombol
+            if (framesProcessed % 5 === 0) {
+                let progress = Math.min(Math.round((framesProcessed / absoluteTotalFrames) * 100), 100);
+                btnDownload.innerText = `Memproses Video (${progress}%)...`;
+            }
         };
 
         try {
+            // TAHAP 1: Render semua pergerakan (Pre, Key, Post)
             for (let i = 0; i < mainFrames.length; i++) {
                 if (abortEncoding) break;
                 await pushToEncoder(mainFrames[i]);
-                
-                // Update persentase UI
-                if (i % 5 === 0) {
-                    let progress = Math.round((i / totalFrames) * 100);
-                    btnDownload.innerText = `Memproses Video (${progress}%)...`;
+            }
+
+            // TAHAP 2: Efek Crossfade (Blend halus pergerakan ke foto diam)
+            if (!abortEncoding) {
+                const lastMotionFrame = mainFrames[mainFrames.length - 1];
+                const blendCanvas = new OffscreenCanvas(encWidth, encHeight);
+                const blendCtx = blendCanvas.getContext('2d', { alpha: false });
+
+                for (let i = 0; i <= fadeFramesCount; i++) {
+                    if (abortEncoding) break;
+                    let progress = i / fadeFramesCount;
+                    let ease = 1 - Math.pow(1 - progress, 3);
+
+                    blendCtx.globalAlpha = 1;
+                    blendCtx.drawImage(lastMotionFrame, 0, 0, encWidth, encHeight);
+                    blendCtx.globalAlpha = ease;
+                    blendCtx.drawImage(livePhotoData.key, 0, 0, encWidth, encHeight);
+
+                    const blendedBmp = await createImageBitmap(blendCanvas);
+                    await pushToEncoder(blendedBmp);
+                    blendedBmp.close();
                 }
             }
 
+            // TAHAP 3: KEMBALIKAN EFEK JEDA! (Hold Frame selama 1.5 detik)
+            if (!abortEncoding) {
+                for (let i = 0; i < holdFramesCount; i++) {
+                    if (abortEncoding) break;
+                    await pushToEncoder(livePhotoData.key);
+                }
+            }
+
+            // FINISHING
             if (!abortEncoding) {
                 await videoEncoder.flush();
                 muxer.finalize();

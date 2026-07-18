@@ -15,14 +15,15 @@ class Camera {
             this.currentStream.getTracks().forEach(track => track.stop());
         }
 
+        // OPTIMASI: 1080p dan 30fps jauh lebih stabil di browser
         const constraints = {
             video: {
                 facingMode: this.facingMode,
-                width: { ideal: 3840 }, // Minta 4K jika bisa
-                height: { ideal: 2160 },
-                frameRate: { ideal: 60 }
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: { ideal: 30 }
             },
-            audio: true // Audio penting untuk Live Photo
+            audio: true 
         };
 
         try {

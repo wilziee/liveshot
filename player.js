@@ -13,6 +13,11 @@ class LivePlayer {
         this.imgEl.style.opacity = '1';
         this.videoEl.classList.add('hidden');
         
+        // OPTIMASI: Cegah Memory Leak dengan membersihkan URL sebelumnya
+        if (this.videoEl.src) {
+            URL.revokeObjectURL(this.videoEl.src); 
+        }
+        
         // Buat URL dari Blob video
         const videoUrl = URL.createObjectURL(shotData.video);
         this.videoEl.src = videoUrl;
@@ -21,9 +26,14 @@ class LivePlayer {
     setupEvents() {
         const startPlay = () => {
             this.videoEl.classList.remove('hidden');
-            this.imgEl.style.opacity = '0'; // Smooth fade to video
             this.videoEl.currentTime = 0;
-            this.videoEl.play();
+            
+            // OPTIMASI: Hilangkan foto (fade) hanya JIKA video sudah benar-benar play
+            this.videoEl.play().then(() => {
+                this.imgEl.style.opacity = '0'; // Smooth fade to video
+            }).catch(err => {
+                console.warn("Video play error/interrupted", err);
+            });
         };
 
         const stopPlay = () => {

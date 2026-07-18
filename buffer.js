@@ -8,18 +8,21 @@ class LiveBuffer {
     }
 
     start(stream) {
-        // Coba format WebM atau MP4 tergantung browser
         const mimeType = MediaRecorder.isTypeSupported('video/webm; codecs=vp8,opus') 
             ? 'video/webm; codecs=vp8,opus' 
             : 'video/mp4';
 
-        this.recorder = new MediaRecorder(stream, { mimeType });
+        // OPTIMASI: Batasi bitrate agar tidak nge-lag saat merekam
+        this.recorder = new MediaRecorder(stream, { 
+            mimeType,
+            videoBitsPerSecond: 2500000 // 2.5 Mbps
+        });
 
         this.recorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
                 this.chunks.push({ time: Date.now(), data: e.data });
                 
-                // Hapus buffer yang lebih tua dari batas keepMs (Circular Buffer)
+                // Hapus buffer yang lebih tua
                 const cutoff = Date.now() - this.keepMs;
                 while (this.chunks.length > 0 && this.chunks[0].time < cutoff) {
                     this.chunks.shift();
@@ -27,8 +30,8 @@ class LiveBuffer {
             }
         };
 
-        // Rekam dalam slice kecil agar bisa dipotong presisi
-        this.recorder.start(200); 
+        // OPTIMASI: Rekam per 500ms agar beban I/O CPU berkurang
+        this.recorder.start(500); 
         this.isBuffering = true;
     }
 
@@ -40,7 +43,6 @@ class LiveBuffer {
         this.chunks = [];
     }
 
-    // Mengambil buffer video (sebelum dan sesudah shutter ditekan)
     async getCompiledBlob() {
         if (this.chunks.length === 0) return null;
         const blob = new Blob(this.chunks.map(c => c.data), { type: this.recorder.mimeType });

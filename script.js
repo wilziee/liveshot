@@ -118,29 +118,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         isCapturing = false;
         livePhotoData.post = [...postCaptureFrames];
         
-        // Langsung tampilkan hasil secara bersih tanpa memicu teks penahan/loading tambahan
+        // Langsung tampilkan hasil secara bersih
         resultView.classList.remove('hidden');
         
-        // Gambar Key Photo persis seperti saat shutter ditekan
-        playCtx.drawImage(livePhotoData.key, 0, 0);
+        // --- LANGSUNG PUTAR OTOMATIS SATU KALI ---
+        startPlayback();
 
         // Jalankan background encoder (Tidak ganggu UI)
         encodeVideoBackground();
     }
 
-    // 5. Playback Logic (Reverse Engineering Hold/Release Apple)
-    let isHolding = false;
+    // 5. Playback Logic (Identik Apple: Auto-play 1x, berhenti di Key Photo, Tap/Hold untuk ulang)
+    let isPlaying = false;
     
     function startPlayback() {
-        if (isHolding) return;
-        isHolding = true;
+        if (isPlaying) return;
+        isPlaying = true;
         
         const allFrames = [...livePhotoData.pre, livePhotoData.key, ...livePhotoData.post];
         let frameIndex = 0;
         let lastPlayTime = performance.now();
 
         function playLoop(timestamp) {
-            if (!isHolding) return; // Langsung mati jika dilepas
+            if (!isPlaying) return; // Batal/mati instan jika dilepas di tengah-tengah
             
             if (timestamp - lastPlayTime >= FRAME_INTERVAL) {
                 playCtx.drawImage(allFrames[frameIndex], 0, 0);
@@ -150,21 +150,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (frameIndex < allFrames.length) {
                 playbackAnimationId = requestAnimationFrame(playLoop);
+            } else {
+                // Selesai memutar 1 kali -> Langsung berhenti tepat di Key Photo
+                isPlaying = false;
+                playCtx.drawImage(livePhotoData.key, 0, 0);
             }
         }
         playbackAnimationId = requestAnimationFrame(playLoop);
     }
 
     function stopPlayback() {
-        if (!isHolding) return;
-        isHolding = false;
+        if (!isPlaying) return;
+        isPlaying = false;
         cancelAnimationFrame(playbackAnimationId);
         
-        // Instan: Kembali ke Key Photo persis (Tidak ada delay Tag Video)
+        // Instan: Snap/Kembali ke Key Photo
         playCtx.drawImage(livePhotoData.key, 0, 0);
     }
 
-    // Event Listener untuk gesture Hold
+    // Event Listener untuk gesture Hold/Tap (Jika user ingin mengulang/melihat lagi)
     playbackCanvas.addEventListener('pointerdown', startPlayback);
     window.addEventListener('pointerup', stopPlayback);
     playbackCanvas.addEventListener('pointerleave', stopPlayback);
@@ -219,6 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 8. Tutup dan Bersihkan Memori
     btnBack.addEventListener('click', () => {
+        stopPlayback(); // Pastikan animasi berhenti jika ditutup saat sedang jalan
         resultView.classList.add('hidden');
         
         // Bebaskan RAM
